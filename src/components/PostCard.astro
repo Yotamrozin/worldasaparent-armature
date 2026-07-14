@@ -1,0 +1,79 @@
+---
+import { urlFor } from '../lib/sanity/image';
+import type { PostCardData } from '../lib/sanity/posts';
+
+interface Props {
+  post: PostCardData;
+  featured?: boolean;
+}
+
+const { post, featured = false } = Astro.props;
+
+const imageUrl = post.mainImage
+  ? urlFor(post.mainImage)
+      .width(featured ? 1200 : 600)
+      .height(featured ? 675 : 400)
+      .fit('crop')
+      .url()
+  : null;
+
+const dateLabel = post.publishedAt
+  ? new Date(post.publishedAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+  : null;
+---
+
+<a class={`post-card ${featured ? 'post-card--featured' : ''}`} href={post.slug ? `/blog/${post.slug}` : '#'}>
+  {imageUrl && <img class="post-card__image" src={imageUrl} alt={post.mainImage?.alt ?? ''} />}
+  <div class="post-card__body">
+    {dateLabel && <p class="post-card__date">{dateLabel}</p>}
+    {post.title && <h3 class="post-card__title">{post.title}</h3>}
+    {post.excerpt && <p class="post-card__excerpt">{post.excerpt}</p>}
+  </div>
+</a>
+
+<style>
+  .post-card {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #f7f7f7;
+  }
+  .post-card__image {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    display: block;
+  }
+  .post-card--featured .post-card__image {
+    aspect-ratio: 16 / 9;
+  }
+  .post-card__body {
+    padding: 1rem 1.25rem 1.5rem;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .post-card__date {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #777;
+  }
+  .post-card__title {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+  .post-card--featured .post-card__title {
+    font-size: 1.75rem;
+  }
+  .post-card__excerpt {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #555;
+  }
+</style>

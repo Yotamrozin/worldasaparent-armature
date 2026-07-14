@@ -1,0 +1,73 @@
+---
+// Shared page chrome: doctype/head, the navbar (sourced from siteSettings),
+// and the draft-mode click-to-edit overlay. Every page renders through this
+// instead of duplicating the same boilerplate.
+import Navbar from '../components/Navbar.astro';
+import { loadQuery } from '../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../lib/sanity/draftMode';
+import { urlFor } from '../lib/sanity/image';
+import { resolveHref, type SanityLink } from '../lib/sanity/link';
+import { VisualEditing } from '@sanity/astro/visual-editing';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+
+// Reads the cookie independently of the page that renders this layout — pages
+// with their own content queries (e.g. block dispatchers) read it again
+// themselves; it's just a cookie read, not worth threading through props.
+const perspective = getPerspectiveCookie(Astro.cookies);
+const draftMode = Boolean(perspective);
+
+const { data: site } = await loadQuery<{
+  title?: string;
+  logo?: { alt?: string } & Record<string, unknown>;
+  primaryNav?: (SanityLink & { label?: string })[];
+} | null>({
+  query: `*[_id == "siteSettings"][0]{
+    title,
+    logo,
+    primaryNav[]{
+      label,
+      linkType,
+      external,
+      internal->{ _type, "slug": slug.current }
+    }
+  }`,
+  perspective,
+});
+
+const logoUrl = site?.logo ? urlFor(site.logo).height(64).fit('max').url() : null;
+
+const navLinks = (site?.primaryNav ?? [])
+  .map((item) => ({ label: item.label, href: resolveHref(item) }))
+  .filter((item): item is { label: string; href: string } => Boolean(item.label && item.href));
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+  </head>
+  <body>
+    <Navbar siteTitle={site?.title} logoUrl={logoUrl} logoAlt={site?.logo?.alt} links={navLinks} />
+    <slot />
+    <VisualEditing enabled={draftMode} />
+  </body>
+</html>
+
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    color: #111;
+  }
+</style>

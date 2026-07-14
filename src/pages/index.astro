@@ -1,0 +1,210 @@
+---
+// Server-rendered so it can read the draft-mode cookie per request (visual
+// editing). This page bypasses the template's generic Layout/Navbar — the
+// ported App component below has its own bespoke navbar (anchor-scroll
+// within this single-page design), so using the generic one would render two.
+export const prerender = false;
+
+import '../styles/global.css';
+import { loadQuery } from '../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../lib/sanity/draftMode';
+import { urlFor } from '../lib/sanity/image';
+import { VisualEditing } from '@sanity/astro/visual-editing';
+import App, { type AppProps, type ImageProp } from '../site/App';
+
+const perspective = getPerspectiveCookie(Astro.cookies);
+const draftMode = Boolean(perspective);
+
+interface SanityImage {
+  asset?: { _ref?: string };
+  alt?: string;
+  filename?: string;
+}
+
+interface HomepageDoc {
+  hero?: { title?: string; byline?: string; images?: SanityImage[] };
+  writingSample?: {
+    heading?: string;
+    intro?: string;
+    bandImages?: SanityImage[];
+    excerpts?: { title?: string; body?: string }[];
+  };
+  letterOfEndorsement?: {
+    heading?: string;
+    intro?: string;
+    letterImage?: SanityImage;
+    letterPdfUrl?: string;
+  };
+  homescape?: {
+    heading?: string;
+    projectTitle?: string;
+    externalUrl?: string;
+    description?: string;
+    presentations?: string[];
+    posterImage?: SanityImage;
+    logoImage?: SanityImage;
+    backgroundVideoUrl?: string;
+    featuredIn?: SanityImage[];
+    galleryImages?: SanityImage[];
+    videos?: { embedUrl?: string; thumbnail?: SanityImage }[];
+  };
+  creativeExperience?: {
+    heading?: string;
+    portfolioSnapshot?: SanityImage;
+    portfolioUrl?: string;
+    description?: string;
+    cvFileUrl?: string;
+  };
+}
+
+const { data: homepage } = await loadQuery<HomepageDoc | null>({
+  query: `*[_id == "homepage"][0]{
+    hero{
+      title,
+      byline,
+      images[]{ ..., "filename": asset->originalFilename }
+    },
+    writingSample{
+      heading,
+      intro,
+      bandImages[]{ ..., "filename": asset->originalFilename },
+      excerpts[]{ title, body }
+    },
+    letterOfEndorsement{
+      heading,
+      intro,
+      letterImage,
+      "letterPdfUrl": letterPdf.asset->url
+    },
+    homescape{
+      heading,
+      projectTitle,
+      externalUrl,
+      description,
+      presentations,
+      posterImage,
+      logoImage,
+      backgroundVideoUrl,
+      featuredIn,
+      galleryImages,
+      videos[]{ embedUrl, thumbnail }
+    },
+    creativeExperience{
+      heading,
+      portfolioSnapshot,
+      portfolioUrl,
+      description,
+      "cvFileUrl": cvFile.asset->url
+    }
+  }`,
+  perspective,
+});
+
+// Resolve a Sanity image object to a plain URL string server-side, so the
+// client React island never needs Sanity config of its own.
+function resolveImage(
+  image: SanityImage | undefined,
+  { width, height, fallbackAlt = '' }: { width: number; height?: number; fallbackAlt?: string },
+): ImageProp | undefined {
+  if (!image?.asset) return undefined;
+  let builder = urlFor(image).width(width).auto('format');
+  if (height) builder = builder.height(height).fit('crop');
+  return { url: builder.url(), alt: image.alt || fallbackAlt, filename: image.filename };
+}
+
+function resolveImages(
+  images: SanityImage[] | undefined,
+  opts: { width: number; height?: number; fallbackAlt?: string },
+): ImageProp[] {
+  return (images ?? [])
+    .map((img) => resolveImage(img, opts))
+    .filter((img): img is ImageProp => Boolean(img));
+}
+
+const props: AppProps = {
+  hero: {
+    title: homepage?.hero?.title ?? 'Untitled',
+    byline: homepage?.hero?.byline,
+    images: resolveImages(homepage?.hero?.images, { width: 900, fallbackAlt: 'Project photo' }),
+  },
+  writingSample: {
+    heading: homepage?.writingSample?.heading ?? 'Writing Sample',
+    intro: homepage?.writingSample?.intro,
+    bandImages: resolveImages(homepage?.writingSample?.bandImages, {
+      width: 900,
+      fallbackAlt: 'Writing sample image',
+    }),
+    excerpts: (homepage?.writingSample?.excerpts ?? []).map((ex) => ({
+      title: ex.title ?? '',
+      body: ex.body ?? '',
+    })),
+  },
+  letterOfEndorsement: {
+    heading: homepage?.letterOfEndorsement?.heading ?? 'Letter of Endorsement',
+    intro: homepage?.letterOfEndorsement?.intro,
+    letterImage: resolveImage(homepage?.letterOfEndorsement?.letterImage, { width: 1200 }),
+    letterPdfUrl: homepage?.letterOfEndorsement?.letterPdfUrl,
+  },
+  homescape: {
+    heading: homepage?.homescape?.heading ?? 'Notable Artistic Practice',
+    projectTitle: homepage?.homescape?.projectTitle ?? '',
+    externalUrl: homepage?.homescape?.externalUrl,
+    description: homepage?.homescape?.description,
+    presentations: homepage?.homescape?.presentations ?? [],
+    posterImage: resolveImage(homepage?.homescape?.posterImage, { width: 1920 }),
+    logoImage: resolveImage(homepage?.homescape?.logoImage, { width: 800 }),
+    backgroundVideoUrl: homepage?.homescape?.backgroundVideoUrl,
+    featuredIn: resolveImages(homepage?.homescape?.featuredIn, { width: 400 }),
+    galleryImages: resolveImages(homepage?.homescape?.galleryImages, { width: 1600 }),
+    videos: (homepage?.homescape?.videos ?? [])
+      .map((v) => {
+        const thumbnail = resolveImage(v.thumbnail, { width: 1200 });
+        return thumbnail && v.embedUrl ? { thumbnail, embedUrl: v.embedUrl } : undefined;
+      })
+      .filter((v): v is { thumbnail: ImageProp; embedUrl: string } => Boolean(v)),
+  },
+  creativeExperience: {
+    heading: homepage?.creativeExperience?.heading ?? 'Creative Professional Experience',
+    portfolioSnapshot: resolveImage(homepage?.creativeExperience?.portfolioSnapshot, { width: 1600 }),
+    portfolioUrl: homepage?.creativeExperience?.portfolioUrl,
+    description: homepage?.creativeExperience?.description,
+    cvFileUrl: homepage?.creativeExperience?.cvFileUrl,
+  },
+};
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{props.hero.title}</title>
+  </head>
+  <body>
+    {
+      homepage ? (
+        <App client:load {...props} />
+      ) : (
+        <main class="empty">
+          <h1>No homepage content yet</h1>
+          <p>
+            Open the <a href="/admin">Studio</a>, fill in the Homepage document, and publish.
+          </p>
+        </main>
+      )
+    }
+    <VisualEditing enabled={draftMode} />
+  </body>
+</html>
+
+<style>
+  .empty {
+    max-width: 40rem;
+    margin: 6rem auto;
+    padding: 0 1.5rem;
+    text-align: center;
+    color: #555;
+    font-family: system-ui, sans-serif;
+  }
+</style>

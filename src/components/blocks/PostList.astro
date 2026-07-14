@@ -1,0 +1,50 @@
+---
+// Like PostFeatured, this queries the post collection independently rather
+// than relying on the page's own query, since the 3 latest posts aren't part
+// of the block's document data. Needs `perspective` for the same reason.
+import { loadQuery } from '../../lib/sanity/loadQuery';
+import { postCardProjection, type PostCardData } from '../../lib/sanity/posts';
+import PostCard from '../PostCard.astro';
+
+interface Props {
+  block: { heading?: string };
+  perspective?: string;
+}
+
+const { block, perspective } = Astro.props;
+
+const { data: posts } = await loadQuery<PostCardData[]>({
+  query: `*[_type == "post" && defined(slug.current)] | order(publishedAt desc) [0...3]${postCardProjection}`,
+  perspective,
+});
+---
+
+{
+  posts && posts.length > 0 && (
+    <section class="post-list">
+      {block.heading && <h2 class="post-list__heading">{block.heading}</h2>}
+      <div class="post-list__grid">
+        {posts.map((post) => <PostCard post={post} />)}
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .post-list {
+    display: grid;
+    gap: 1.5rem;
+    padding: 3rem 1.5rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+  .post-list__heading {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  .post-list__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+</style>

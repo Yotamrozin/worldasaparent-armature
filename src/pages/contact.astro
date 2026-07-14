@@ -1,0 +1,101 @@
+---
+// Server-rendered for the same reason as the homepage: reads the draft-mode
+// cookie per request and reflects published changes without a rebuild.
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import { loadQuery } from '../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../lib/sanity/draftMode';
+
+const perspective = getPerspectiveCookie(Astro.cookies);
+
+const { data } = await loadQuery<{
+  meta: {
+    heading?: string;
+    intro?: string;
+    seo?: { title?: string; description?: string };
+  } | null;
+  site: { email?: string; phone?: string; address?: string } | null;
+}>({
+  query: `{
+    "meta": *[_id == "contact"][0]{ heading, intro, seo },
+    "site": *[_id == "siteSettings"][0]{ email, phone, address }
+  }`,
+  perspective,
+});
+
+const { meta, site } = data;
+---
+
+<Layout
+  title={meta?.seo?.title || meta?.heading || 'Contact'}
+  description={meta?.seo?.description || meta?.intro}
+>
+  <main class="contact">
+    <h1 class="contact__heading">{meta?.heading || 'Contact'}</h1>
+    {meta?.intro && <p class="contact__intro">{meta.intro}</p>}
+    {
+      (site?.email || site?.phone || site?.address) && (
+        <dl class="contact__details">
+          {site?.email && (
+            <div class="contact__row">
+              <dt>Email</dt>
+              <dd>
+                <a href={`mailto:${site.email}`}>{site.email}</a>
+              </dd>
+            </div>
+          )}
+          {site?.phone && (
+            <div class="contact__row">
+              <dt>Phone</dt>
+              <dd>
+                <a href={`tel:${site.phone}`}>{site.phone}</a>
+              </dd>
+            </div>
+          )}
+          {site?.address && (
+            <div class="contact__row">
+              <dt>Address</dt>
+              <dd>{site.address}</dd>
+            </div>
+          )}
+        </dl>
+      )
+    }
+  </main>
+</Layout>
+
+<style>
+  .contact {
+    max-width: 42rem;
+    margin-inline: auto;
+    padding: 3rem 1.5rem;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .contact__heading {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    margin: 0;
+  }
+  .contact__intro {
+    font-size: 1.1rem;
+    color: #333;
+    line-height: 1.6;
+  }
+  .contact__details {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+  }
+  .contact__details dt {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #777;
+  }
+  .contact__details dd {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+</style>

@@ -1,0 +1,144 @@
+---
+// Dynamic route, server-rendered (no getStaticPaths needed once prerender is
+// false — Astro resolves Astro.params.slug from the request at runtime, same
+// hybrid pattern used by / and the draft-mode API routes).
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import { loadQuery } from '../../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../../lib/sanity/draftMode';
+import { urlFor } from '../../lib/sanity/image';
+import { PortableText } from '@portabletext/react';
+import type { PostCardData } from '../../lib/sanity/posts';
+
+const { slug } = Astro.params;
+const perspective = getPerspectiveCookie(Astro.cookies);
+
+const { data: post } = await loadQuery<
+  | (PostCardData & {
+      body?: unknown[];
+      seo?: { title?: string; description?: string };
+    })
+  | null
+>({
+  query: `*[_type == "post" && slug.current == $slug][0]{
+    title,
+    "slug": slug.current,
+    excerpt,
+    mainImage,
+    publishedAt,
+    body,
+    seo
+  }`,
+  params: { slug },
+  perspective,
+});
+
+const imageUrl = post?.mainImage
+  ? urlFor(post.mainImage).width(1600).height(900).fit('crop').url()
+  : null;
+
+const dateLabel = post?.publishedAt
+  ? new Date(post.publishedAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+  : null;
+---
+
+<Layout
+  title={post?.seo?.title || post?.title || 'Post'}
+  description={post?.seo?.description || post?.excerpt}
+>
+  {
+    post ? (
+      <main class="post-detail">
+        <a class="post-detail__back" href="/blog">
+          ← Back to blog
+        </a>
+        {imageUrl && <img class="post-detail__image" src={imageUrl} alt={post.mainImage?.alt ?? ''} />}
+        {dateLabel && <p class="post-detail__date">{dateLabel}</p>}
+        <h1 class="post-detail__title">{post.title}</h1>
+        {post.excerpt && <p class="post-detail__excerpt">{post.excerpt}</p>}
+        {post.body && post.body.length > 0 && (
+          <div class="post-detail__body">
+            <PortableText value={post.body as never} />
+          </div>
+        )}
+      </main>
+    ) : (
+      <main class="post-detail post-detail--empty">
+        <h1>Post not found</h1>
+        <p>
+          <a href="/blog">← Back to blog</a>
+        </p>
+      </main>
+    )
+  }
+</Layout>
+
+<style>
+  .post-detail {
+    max-width: 42rem;
+    margin-inline: auto;
+    padding: 3rem 1.5rem;
+    display: grid;
+    gap: 1rem;
+  }
+  .post-detail__back {
+    color: #555;
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .post-detail__image {
+    width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    object-fit: cover;
+  }
+  .post-detail__date {
+    margin: 0;
+    color: #777;
+    font-size: 0.9rem;
+  }
+  .post-detail__title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    line-height: 1.1;
+    margin: 0;
+  }
+  .post-detail__excerpt {
+    font-size: 1.1rem;
+    color: #333;
+  }
+  .post-detail__body {
+    display: grid;
+    gap: 1rem;
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+  .post-detail__body :global(h2),
+  .post-detail__body :global(h3),
+  .post-detail__body :global(h4) {
+    margin: 0.5rem 0 0;
+    line-height: 1.2;
+  }
+  .post-detail__body :global(p) {
+    margin: 0;
+  }
+  .post-detail__body :global(ul),
+  .post-detail__body :global(ol) {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+  .post-detail__body :global(blockquote) {
+    margin: 0;
+    padding-left: 1rem;
+    border-left: 3px solid #ddd;
+    color: #555;
+  }
+  .post-detail--empty {
+    text-align: center;
+    color: #555;
+  }
+</style>

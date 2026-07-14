@@ -1,0 +1,70 @@
+---
+// Server-rendered for the same reason as the homepage: reads the draft-mode
+// cookie per request and reflects published changes without a rebuild.
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import { loadQuery } from '../../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../../lib/sanity/draftMode';
+import { postCardProjection, type PostCardData } from '../../lib/sanity/posts';
+import PostCard from '../../components/PostCard.astro';
+
+const perspective = getPerspectiveCookie(Astro.cookies);
+
+const { data } = await loadQuery<{
+  meta: { title?: string; intro?: string } | null;
+  posts: PostCardData[];
+}>({
+  query: `{
+    "meta": *[_id == "blogIndex"][0]{ title, intro },
+    "posts": *[_type == "post" && defined(slug.current)] | order(publishedAt desc)${postCardProjection}
+  }`,
+  perspective,
+});
+
+const { meta, posts } = data;
+---
+
+<Layout title={meta?.title || 'Blog'} description={meta?.intro}>
+  <main class="blog-index">
+    <h1 class="blog-index__heading">{meta?.title || 'Blog'}</h1>
+    {meta?.intro && <p class="blog-index__intro">{meta.intro}</p>}
+    {
+      posts && posts.length > 0 ? (
+        <div class="blog-index__grid">
+          {posts.map((post) => <PostCard post={post} />)}
+        </div>
+      ) : (
+        <p class="blog-index__empty">
+          No posts yet. Open the <a href="/admin">Studio</a> and publish one.
+        </p>
+      )
+    }
+  </main>
+</Layout>
+
+<style>
+  .blog-index {
+    max-width: 64rem;
+    margin-inline: auto;
+    padding: 3rem 1.5rem;
+  }
+  .blog-index__heading {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    margin: 0 0 1rem;
+  }
+  .blog-index__intro {
+    font-size: 1.1rem;
+    color: #555;
+    margin: 0 0 2rem;
+    max-width: 40rem;
+  }
+  .blog-index__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+  .blog-index__empty {
+    color: #555;
+  }
+</style>

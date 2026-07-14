@@ -1,0 +1,67 @@
+---
+import { urlFor } from '../../lib/sanity/image';
+import { resolveHref, type SanityLink } from '../../lib/sanity/link';
+
+interface Props {
+  block: {
+    heading?: string;
+    subheading?: string;
+    image?: import('@sanity/image-url/lib/types/types').SanityImageSource & {
+      alt?: string;
+    };
+    cta?: SanityLink & { label?: string };
+  };
+}
+
+const { block } = Astro.props;
+const imageUrl = block.image
+  ? urlFor(block.image).width(1600).height(900).fit('crop').url()
+  : null;
+const ctaHref = resolveHref(block.cta);
+---
+
+<section class="hero-block">
+  {imageUrl && <img class="hero-block__image" src={imageUrl} alt={block.image?.alt ?? ''} />}
+  <div class="hero-block__content">
+    {block.heading && <h2 class="hero-block__heading">{block.heading}</h2>}
+    {block.subheading && <p class="hero-block__subheading">{block.subheading}</p>}
+    {ctaHref && block.cta?.label && (
+      <a class="hero-block__cta" href={ctaHref}>{block.cta.label}</a>
+    )}
+  </div>
+</section>
+
+<style>
+  .hero-block {
+    display: grid;
+    gap: 1.5rem;
+    padding: 3rem 1.5rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+  .hero-block__image {
+    width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    object-fit: cover;
+  }
+  .hero-block__heading {
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    line-height: 1.1;
+    margin: 0;
+  }
+  .hero-block__subheading {
+    font-size: 1.125rem;
+    color: #555;
+    margin: 0;
+  }
+  .hero-block__cta {
+    justify-self: start;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.5rem;
+    background: #111;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+</style>

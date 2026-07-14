@@ -1,0 +1,54 @@
+---
+// Unlike Hero, this block's content lives on a *different* document (the
+// referenced post), so the page's generic `sections[]{ ..., _type }` query
+// only gives us the raw reference — this component fetches the post itself,
+// which is why it needs `perspective` threaded in from the page (see
+// src/lib/blocks.ts and src/pages/index.astro).
+import { loadQuery } from '../../lib/sanity/loadQuery';
+import { postCardProjection, type PostCardData } from '../../lib/sanity/posts';
+import PostCard from '../PostCard.astro';
+
+interface Props {
+  block: {
+    heading?: string;
+    post?: { _ref?: string };
+  };
+  perspective?: string;
+}
+
+const { block, perspective } = Astro.props;
+
+const { data: post } = block.post?._ref
+  ? await loadQuery<PostCardData>({
+      query: `*[_id == $id][0]${postCardProjection}`,
+      params: { id: block.post._ref },
+      perspective,
+    })
+  : { data: null };
+---
+
+{
+  post && (
+    <section class="post-featured">
+      {block.heading && <h2 class="post-featured__heading">{block.heading}</h2>}
+      <PostCard post={post} featured />
+    </section>
+  )
+}
+
+<style>
+  .post-featured {
+    display: grid;
+    gap: 1.25rem;
+    padding: 3rem 1.5rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+  .post-featured__heading {
+    margin: 0;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #777;
+  }
+</style>

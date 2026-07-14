@@ -1,0 +1,89 @@
+---
+// Server-rendered for the same reason as the homepage: reads the draft-mode
+// cookie per request and reflects published changes without a rebuild.
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import { loadQuery } from '../lib/sanity/loadQuery';
+import { getPerspectiveCookie } from '../lib/sanity/draftMode';
+import { urlFor } from '../lib/sanity/image';
+import { blockComponents } from '../lib/blocks';
+
+const perspective = getPerspectiveCookie(Astro.cookies);
+
+const { data: about } = await loadQuery<{
+  heading?: string;
+  intro?: string;
+  image?: { alt?: string } & Record<string, unknown>;
+  sections?: { _type: string }[];
+  seo?: { title?: string; description?: string };
+}>({
+  query: `*[_id == "about"][0]{
+    heading,
+    intro,
+    image,
+    sections[]{ ..., _type },
+    seo
+  }`,
+  perspective,
+});
+
+const imageUrl = about?.image
+  ? urlFor(about.image).width(1200).height(800).fit('crop').url()
+  : null;
+---
+
+<Layout
+  title={about?.seo?.title || about?.heading || 'About'}
+  description={about?.seo?.description || about?.intro}
+>
+  {
+    about ? (
+      <main class="about">
+        <h1 class="about__heading">{about.heading}</h1>
+        {about.intro && <p class="about__intro">{about.intro}</p>}
+        {imageUrl && <img class="about__image" src={imageUrl} alt={about.image?.alt ?? ''} />}
+        {(about.sections ?? []).map((section) => {
+          const Block = blockComponents[section._type as keyof typeof blockComponents];
+          return Block ? <Block block={section} perspective={perspective} /> : null;
+        })}
+      </main>
+    ) : (
+      <main class="about about--empty">
+        <h1>No About content yet</h1>
+        <p>
+          Open the <a href="/admin">Studio</a>, fill in the About document, and publish.
+        </p>
+      </main>
+    )
+  }
+</Layout>
+
+<style>
+  .about {
+    max-width: 42rem;
+    margin-inline: auto;
+    padding: 3rem 1.5rem;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .about__heading {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    margin: 0;
+  }
+  .about__intro {
+    font-size: 1.1rem;
+    color: #333;
+    line-height: 1.6;
+  }
+  .about__image {
+    width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    object-fit: cover;
+  }
+  .about--empty {
+    text-align: center;
+    color: #555;
+  }
+</style>
