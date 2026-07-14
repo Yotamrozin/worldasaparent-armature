@@ -3,6 +3,7 @@
 // image builder) and client-side (LiveHomepage.tsx, with a lightweight
 // public-config-only builder) for live-updating content in Presentation —
 // same logic, different (injected) image URL builder.
+import { stegaClean } from '@sanity/client/stega';
 import type { AppProps, PositionedImageProp } from './App';
 import { HERO_POSITIONS, WRITING_SAMPLE_POSITIONS, FALLBACK_SLOT } from './photoPositions';
 
@@ -125,7 +126,13 @@ export function resolveHomepageProps(
       .map((img) => {
         const base = resolveImage(img, opts);
         if (!base) return undefined;
-        const slot = (img.filename && positions[img.filename]) || FALLBACK_SLOT;
+        // In draft mode, string fields (including this one) carry invisible
+        // stega-encoded characters for click-to-edit, so the raw value never
+        // exactly matches a plain lookup key — clean it first or every image
+        // silently falls back to FALLBACK_SLOT (this was the actual cause of
+        // photos appearing stacked in Presentation specifically).
+        const filename = img.filename ? (stegaClean(img.filename) as string) : undefined;
+        const slot = (filename && positions[filename]) || FALLBACK_SLOT;
         return { ...base, ...slot };
       })
       .filter((img): img is PositionedImageProp => Boolean(img));
