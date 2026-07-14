@@ -10,7 +10,8 @@ import { loadQuery } from '../lib/sanity/loadQuery';
 import { getPerspectiveCookie } from '../lib/sanity/draftMode';
 import { urlFor } from '../lib/sanity/image';
 import { VisualEditing } from '@sanity/astro/visual-editing';
-import App, { type AppProps, type ImageProp } from '../site/App';
+import App, { type AppProps, type ImageProp, type PositionedImageProp } from '../site/App';
+import { HERO_POSITIONS, WRITING_SAMPLE_POSITIONS, FALLBACK_SLOT } from '../site/photoPositions';
 
 const perspective = getPerspectiveCookie(Astro.cookies);
 const draftMode = Boolean(perspective);
@@ -109,7 +110,7 @@ function resolveImage(
   if (!image?.asset) return undefined;
   let builder = urlFor(image).width(width).auto('format');
   if (height) builder = builder.height(height).fit('crop');
-  return { url: builder.url(), alt: image.alt || fallbackAlt, filename: image.filename };
+  return { url: builder.url(), alt: image.alt || fallbackAlt };
 }
 
 function resolveImages(
@@ -121,16 +122,37 @@ function resolveImages(
     .filter((img): img is ImageProp => Boolean(img));
 }
 
+// Hero/writing-sample images additionally get their hand-placed position
+// (design, not content) baked in here, server-side, matched by original
+// filename — so the client component never needs to do this lookup itself.
+function resolvePositionedImages(
+  images: SanityImage[] | undefined,
+  positions: typeof HERO_POSITIONS,
+  opts: { width: number; height?: number; fallbackAlt?: string },
+): PositionedImageProp[] {
+  return (images ?? [])
+    .map((img) => {
+      const base = resolveImage(img, opts);
+      if (!base) return undefined;
+      const slot = (img.filename && positions[img.filename]) || FALLBACK_SLOT;
+      return { ...base, ...slot };
+    })
+    .filter((img): img is PositionedImageProp => Boolean(img));
+}
+
 const props: AppProps = {
   hero: {
     title: homepage?.hero?.title ?? 'Untitled',
     byline: homepage?.hero?.byline,
-    images: resolveImages(homepage?.hero?.images, { width: 900, fallbackAlt: 'Project photo' }),
+    images: resolvePositionedImages(homepage?.hero?.images, HERO_POSITIONS, {
+      width: 900,
+      fallbackAlt: 'Project photo',
+    }),
   },
   writingSample: {
     heading: homepage?.writingSample?.heading ?? 'Writing Sample',
     intro: homepage?.writingSample?.intro,
-    bandImages: resolveImages(homepage?.writingSample?.bandImages, {
+    bandImages: resolvePositionedImages(homepage?.writingSample?.bandImages, WRITING_SAMPLE_POSITIONS, {
       width: 900,
       fallbackAlt: 'Writing sample image',
     }),
