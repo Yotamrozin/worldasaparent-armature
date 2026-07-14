@@ -3,196 +3,32 @@
 // editing). This page bypasses the template's generic Layout/Navbar — the
 // ported App component below has its own bespoke navbar (anchor-scroll
 // within this single-page design), so using the generic one would render two.
+//
+// Uses LiveHomepage (not @sanity/astro's <VisualEditing>) so edits in
+// Presentation stream in live instead of requiring a full page reload — see
+// src/site/LiveHomepage.tsx for why.
 export const prerender = false;
 
 import '../styles/global.css';
 import { loadQuery } from '../lib/sanity/loadQuery';
 import { getPerspectiveCookie } from '../lib/sanity/draftMode';
 import { urlFor } from '../lib/sanity/image';
-import { VisualEditing } from '@sanity/astro/visual-editing';
-import App, { type AppProps, type ImageProp, type PositionedImageProp } from '../site/App';
-import { HERO_POSITIONS, WRITING_SAMPLE_POSITIONS, FALLBACK_SLOT } from '../site/photoPositions';
+import LiveHomepage from '../site/LiveHomepage';
+import { resolveHomepageProps, HOMEPAGE_QUERY, type HomepageDoc } from '../site/resolveHomepageProps';
 
 const perspective = getPerspectiveCookie(Astro.cookies);
 const draftMode = Boolean(perspective);
 
-interface SanityImage {
-  asset?: { _ref?: string };
-  alt?: string;
-  filename?: string;
-}
-
-interface HomepageDoc {
-  hero?: { title?: string; byline?: string; images?: SanityImage[] };
-  writingSample?: {
-    heading?: string;
-    intro?: string;
-    bandImages?: SanityImage[];
-    excerpts?: { title?: string; body?: string }[];
-  };
-  letterOfEndorsement?: {
-    heading?: string;
-    intro?: string;
-    letterImage?: SanityImage;
-    letterPdfUrl?: string;
-  };
-  homescape?: {
-    heading?: string;
-    projectTitle?: string;
-    externalUrl?: string;
-    description?: string;
-    presentations?: string[];
-    posterImage?: SanityImage;
-    logoImage?: SanityImage;
-    backgroundVideoUrl?: string;
-    featuredIn?: SanityImage[];
-    galleryImages?: SanityImage[];
-    videos?: { embedUrl?: string; thumbnail?: SanityImage }[];
-  };
-  creativeExperience?: {
-    heading?: string;
-    portfolioSnapshot?: SanityImage;
-    portfolioUrl?: string;
-    description?: string;
-    cvFileUrl?: string;
-  };
-}
-
 const { data: homepage } = await loadQuery<HomepageDoc | null>({
-  query: `*[_id == "homepage"][0]{
-    hero{
-      title,
-      byline,
-      images[]{ ..., "filename": asset->originalFilename }
-    },
-    writingSample{
-      heading,
-      intro,
-      bandImages[]{ ..., "filename": asset->originalFilename },
-      excerpts[]{ title, body }
-    },
-    letterOfEndorsement{
-      heading,
-      intro,
-      letterImage,
-      "letterPdfUrl": letterPdf.asset->url
-    },
-    homescape{
-      heading,
-      projectTitle,
-      externalUrl,
-      description,
-      presentations,
-      posterImage,
-      logoImage,
-      backgroundVideoUrl,
-      featuredIn,
-      galleryImages,
-      videos[]{ embedUrl, thumbnail }
-    },
-    creativeExperience{
-      heading,
-      portfolioSnapshot,
-      portfolioUrl,
-      description,
-      "cvFileUrl": cvFile.asset->url
-    }
-  }`,
+  query: HOMEPAGE_QUERY,
   perspective,
 });
 
-// Resolve a Sanity image object to a plain URL string server-side, so the
-// client React island never needs Sanity config of its own.
-function resolveImage(
-  image: SanityImage | undefined,
-  { width, height, fallbackAlt = '' }: { width: number; height?: number; fallbackAlt?: string },
-): ImageProp | undefined {
-  if (!image?.asset) return undefined;
-  let builder = urlFor(image).width(width).auto('format');
-  if (height) builder = builder.height(height).fit('crop');
-  return { url: builder.url(), alt: image.alt || fallbackAlt };
-}
-
-function resolveImages(
-  images: SanityImage[] | undefined,
-  opts: { width: number; height?: number; fallbackAlt?: string },
-): ImageProp[] {
-  return (images ?? [])
-    .map((img) => resolveImage(img, opts))
-    .filter((img): img is ImageProp => Boolean(img));
-}
-
-// Hero/writing-sample images additionally get their hand-placed position
-// (design, not content) baked in here, server-side, matched by original
-// filename — so the client component never needs to do this lookup itself.
-function resolvePositionedImages(
-  images: SanityImage[] | undefined,
-  positions: typeof HERO_POSITIONS,
-  opts: { width: number; height?: number; fallbackAlt?: string },
-): PositionedImageProp[] {
-  return (images ?? [])
-    .map((img) => {
-      const base = resolveImage(img, opts);
-      if (!base) return undefined;
-      const slot = (img.filename && positions[img.filename]) || FALLBACK_SLOT;
-      return { ...base, ...slot };
-    })
-    .filter((img): img is PositionedImageProp => Boolean(img));
-}
-
-const props: AppProps = {
-  hero: {
-    title: homepage?.hero?.title ?? 'Untitled',
-    byline: homepage?.hero?.byline,
-    images: resolvePositionedImages(homepage?.hero?.images, HERO_POSITIONS, {
-      width: 900,
-      fallbackAlt: 'Project photo',
-    }),
-  },
-  writingSample: {
-    heading: homepage?.writingSample?.heading ?? 'Writing Sample',
-    intro: homepage?.writingSample?.intro,
-    bandImages: resolvePositionedImages(homepage?.writingSample?.bandImages, WRITING_SAMPLE_POSITIONS, {
-      width: 900,
-      fallbackAlt: 'Writing sample image',
-    }),
-    excerpts: (homepage?.writingSample?.excerpts ?? []).map((ex) => ({
-      title: ex.title ?? '',
-      body: ex.body ?? '',
-    })),
-  },
-  letterOfEndorsement: {
-    heading: homepage?.letterOfEndorsement?.heading ?? 'Letter of Endorsement',
-    intro: homepage?.letterOfEndorsement?.intro,
-    letterImage: resolveImage(homepage?.letterOfEndorsement?.letterImage, { width: 1200 }),
-    letterPdfUrl: homepage?.letterOfEndorsement?.letterPdfUrl,
-  },
-  homescape: {
-    heading: homepage?.homescape?.heading ?? 'Notable Artistic Practice',
-    projectTitle: homepage?.homescape?.projectTitle ?? '',
-    externalUrl: homepage?.homescape?.externalUrl,
-    description: homepage?.homescape?.description,
-    presentations: homepage?.homescape?.presentations ?? [],
-    posterImage: resolveImage(homepage?.homescape?.posterImage, { width: 1920 }),
-    logoImage: resolveImage(homepage?.homescape?.logoImage, { width: 800 }),
-    backgroundVideoUrl: homepage?.homescape?.backgroundVideoUrl,
-    featuredIn: resolveImages(homepage?.homescape?.featuredIn, { width: 400 }),
-    galleryImages: resolveImages(homepage?.homescape?.galleryImages, { width: 1600 }),
-    videos: (homepage?.homescape?.videos ?? [])
-      .map((v) => {
-        const thumbnail = resolveImage(v.thumbnail, { width: 1200 });
-        return thumbnail && v.embedUrl ? { thumbnail, embedUrl: v.embedUrl } : undefined;
-      })
-      .filter((v): v is { thumbnail: ImageProp; embedUrl: string } => Boolean(v)),
-  },
-  creativeExperience: {
-    heading: homepage?.creativeExperience?.heading ?? 'Creative Professional Experience',
-    portfolioSnapshot: resolveImage(homepage?.creativeExperience?.portfolioSnapshot, { width: 1600 }),
-    portfolioUrl: homepage?.creativeExperience?.portfolioUrl,
-    description: homepage?.creativeExperience?.description,
-    cvFileUrl: homepage?.creativeExperience?.cvFileUrl,
-  },
-};
+const props = resolveHomepageProps(homepage, (image, opts) => {
+  let builder = urlFor(image).width(opts.width).auto('format');
+  if (opts.height) builder = builder.height(opts.height).fit('crop');
+  return builder.url();
+});
 ---
 
 <html lang="en">
@@ -206,7 +42,7 @@ const props: AppProps = {
   <body>
     {
       homepage ? (
-        <App client:load {...props} />
+        <LiveHomepage client:load initialProps={props} enabled={draftMode} />
       ) : (
         <main class="empty">
           <h1>No homepage content yet</h1>
@@ -216,7 +52,6 @@ const props: AppProps = {
         </main>
       )
     }
-    <VisualEditing enabled={draftMode} />
   </body>
 </html>
 
