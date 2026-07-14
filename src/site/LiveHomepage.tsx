@@ -14,6 +14,15 @@
 // image edits stream in and re-render instantly; `refresh` (full reload)
 // still exists as a fallback for structural changes (e.g. adding a whole new
 // section) that a query-diff alone wouldn't necessarily catch cleanly.
+//
+// Known limitation: the comlink connection this depends on (the same one
+// click-to-edit overlays use) is documented as intermittently unreliable in
+// Sanity's own Presentation Tool — see
+// https://github.com/sanity-io/sanity/issues/12353 (open, unresolved as of
+// writing). When it fails to connect, this silently falls back to
+// `initialProps` (the last full page load) rather than erroring — so the
+// worst case is "requires a manual refresh to see edits," the same
+// behavior this page had before live streaming was added, not a regression.
 
 import { useEffect, useMemo, useRef } from 'react';
 import {
@@ -159,11 +168,6 @@ export default function LiveHomepage({ initialProps, enabled }: Props) {
 
   const liveProps = useMemo(() => {
     if (!presentation.data) return null;
-    // Temporary diagnostic: comparing this against the plain tab's correct
-    // rendering will show whether the live query is returning the expected
-    // hero.images filenames, or something else is off in this path.
-    // eslint-disable-next-line no-console
-    console.log('[LiveHomepage] presentation.data:', presentation.data);
     return resolveHomepageProps(presentation.data as HomepageDoc, (image, opts) => {
       let builder = clientUrlFor(image).width(opts.width).auto('format');
       if (opts.height) builder = builder.height(opts.height).fit('crop');
