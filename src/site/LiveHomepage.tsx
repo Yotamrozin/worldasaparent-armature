@@ -159,6 +159,11 @@ export default function LiveHomepage({ initialProps, enabled }: Props) {
 
   const liveProps = useMemo(() => {
     if (!presentation.data) return null;
+    // Temporary diagnostic: comparing this against the plain tab's correct
+    // rendering will show whether the live query is returning the expected
+    // hero.images filenames, or something else is off in this path.
+    // eslint-disable-next-line no-console
+    console.log('[LiveHomepage] presentation.data:', presentation.data);
     return resolveHomepageProps(presentation.data as HomepageDoc, (image, opts) => {
       let builder = clientUrlFor(image).width(opts.width).auto('format');
       if (opts.height) builder = builder.height(opts.height).fit('crop');
