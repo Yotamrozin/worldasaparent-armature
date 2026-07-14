@@ -561,16 +561,24 @@ function WritingSampleSection({
           <FadeUp key={i} delay={i * 0.08}>
             <p style={{ fontFamily: BODY, fontWeight: 600, color: BLUE, marginBottom: '1rem' }}>{ex.title}</p>
             {/* CSS columns let the text flow and balance naturally across two
-                columns, rather than needing a hand-maintained split point. */}
+                columns, rather than needing a hand-maintained split point.
+                Rendered as one text node (white-space: pre-line for the
+                paragraph breaks) rather than splitting into multiple <p>
+                tags — splitting a single field's text across several DOM
+                elements breaks click-to-edit for all but one of them, since
+                the invisible stega markers that make text editable don't
+                survive being cut apart mid-string. */}
             <div
               className="columns-1 md:columns-2 gap-10"
-              style={{ fontFamily: BODY, fontSize: 'clamp(0.85rem, 1.1vw, 1rem)', color: BLUE, lineHeight: 1.6 }}
+              style={{
+                fontFamily: BODY,
+                fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
+                color: BLUE,
+                lineHeight: 1.6,
+                whiteSpace: 'pre-line',
+              }}
             >
-              {ex.body.split('\n\n').map((p, j) => (
-                <p key={j} style={{ marginBottom: '1rem', breakInside: 'avoid' }}>
-                  {p}
-                </p>
-              ))}
+              {ex.body}
             </div>
           </FadeUp>
         ))}
@@ -781,21 +789,23 @@ function HomescapeSection({ homescape, scrollY }: { homescape: AppProps['homesca
                   {projectTitle}
                 </h3>
               )}
-              {description &&
-                description.split('\n\n').map((p, j) => (
-                  <p
-                    key={j}
-                    style={{
-                      fontFamily: BODY,
-                      fontSize: 'clamp(0.9rem, 1.2vw, 1.1rem)',
-                      color: 'white',
-                      lineHeight: 1.6,
-                      marginBottom: '1.25rem',
-                    }}
-                  >
-                    {p}
-                  </p>
-                ))}
+              {/* One text node (white-space: pre-line), not split into
+                  multiple <p> tags — see the writing-sample excerpt comment
+                  above for why splitting breaks click-to-edit. */}
+              {description && (
+                <p
+                  style={{
+                    fontFamily: BODY,
+                    fontSize: 'clamp(0.9rem, 1.2vw, 1.1rem)',
+                    color: 'white',
+                    lineHeight: 1.6,
+                    marginBottom: '1.25rem',
+                    whiteSpace: 'pre-line',
+                  }}
+                >
+                  {description}
+                </p>
+              )}
               {externalUrl && (
                 <SecondaryButton href={externalUrl} light>
                   More Info
