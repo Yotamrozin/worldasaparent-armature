@@ -291,10 +291,16 @@ function ParallaxImage({
 }) {
   const offset = -scrollY * factor;
 
+  // whileInView (not a fixed `animate` prop) so the reveal is driven by an
+  // IntersectionObserver after mount rather than by comparing against the
+  // server-rendered "initial" state — mount-triggered `animate` can get
+  // stuck at its initial (invisible) state if Framer Motion mistakes
+  // hydration for "already in the right state, nothing to animate".
   const revealProps = reveal
     ? {
         initial: { opacity: 0, scale: 0.94, filter: 'blur(6px)' },
-        animate: { opacity: 1, scale: 1, filter: 'blur(0px)' },
+        whileInView: { opacity: 1, scale: 1, filter: 'blur(0px)' },
+        viewport: { once: true, amount: 0 },
         transition: { duration: 0.95, delay: revealDelay, ease: [0.22, 1, 0.36, 1] as const },
       }
     : {};
@@ -536,7 +542,8 @@ function HeroSection({ hero, scrollY }: { hero: AppProps['hero']; scrollY: numbe
             fontSize: 'clamp(2rem, 4vw, 3.2rem)',
             color: BLUE,
             lineHeight: 0.9,
-            letterSpacing: '-0.01em',
+            width: '100%',
+            textAlign: 'center',
           }}
         >
           {hero.title}
